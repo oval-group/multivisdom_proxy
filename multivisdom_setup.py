@@ -108,10 +108,10 @@ def ask_what_to_do():
     print("This tool will help you configure a multivisdom proxy with nginx.")
     print("Possible actions:")
     print("{}: to quit.".format(ACTION_STOP))
-    print("{}: to list all entries for your user.".format(ACTION_LIST))
-    print("{}: to add an entry for your user.".format(ACTION_ADD))
-    print("{}: to delete an entry for your user.".format(ACTION_DEL))
-    print("{}: to add access credential for your user's entries.".format(ACTION_PASS))
+    print("{}: to list all links for your user.".format(ACTION_LIST))
+    print("{}: to add a link for your user.".format(ACTION_ADD))
+    print("{}: to delete a link for your user.".format(ACTION_DEL))
+    print("{}: to add access credential for your user's links.".format(ACTION_PASS))
     print("")
     print("Options that should be used by privileged users only:")
     print("{}: to initialize configuration of nginx (done once by main user).".format(ACTION_INIT))
@@ -225,13 +225,13 @@ def write_entries(args, entries):
 
 def list_available(args):
     entries = get_available_entries(args)
-    print("Available entries for {}:".format(args.user))
+    print("Available links for {}:".format(args.user))
     for path, server in entries:
         print("{} => {}".format(path, server))
 
 def add_entry(args):
     entries = get_available_entries(args)
-    path = input("What is the path you want your entry to be available at? ")
+    path = input("What is the path you want your link to be available at? ")
     serv_addr = input("What is the server address the path should point to? ")
     serv_port = input("What is the server port the path should point to? ")
 
@@ -273,11 +273,11 @@ def add_entry(args):
 
 def delete_entry(args):
     entries = get_available_entries(args)
-    print("Available entries for {}:".format(args.user))
+    print("Available links for {}:".format(args.user))
     for idx, (path, server) in enumerate(entries):
         print("[{}] {} => {}".format(idx, path, server))
     while True:
-        answer = input("Enter number of the entry you want to delete: ")
+        answer = input("Enter number of the link you want to delete: ")
         try:
             to_del = int(answer)
             if to_del < 0 or to_del >= len(entries):
