@@ -76,7 +76,7 @@ USER_HTML_HEADER = """
 """
 
 USER_HTML_CONTENT = """
-<li><a href="{path}">{path}</a>
+<li><a href="{path}">{path}</a> {descr}
 """
 
 USER_HTML_FOOTER = """
@@ -87,7 +87,7 @@ USER_HTML_FOOTER = """
 """
 
 SPECIAL_COMMENT_MARK = "###"
-SPECIAL_COMMENT_SEPARATOR = ","
+SPECIAL_COMMENT_SEPARATOR = "||"
 
 def get_shared_conf(args):
     all_conf_file_path = os.path.join(args.nginx_path, "sites-available", "multi_visdom_all.conf")
@@ -205,8 +205,8 @@ def get_available_entries(args):
 def write_entries(args, entries):
     user_file, user_cred_file, user_html_file = get_user_files(args)
     with open(user_file, "w") as output_f:
-        for path, server in entries:
-            header = SPECIAL_COMMENT_MARK+path+SPECIAL_COMMENT_SEPARATOR+server
+        for path, server, descr in entries:
+            header = SPECIAL_COMMENT_MARK+path+SPECIAL_COMMENT_SEPARATOR+server+SPECIAL_COMMENT_SEPARATOR+descr
             output_f.write(USER_CONF_TEMPLATE.format(header=header, path=path, server=server, cred_file=user_cred_file))
             output_f.write("\n\n")
 
@@ -216,8 +216,8 @@ def write_entries(args, entries):
 
     with open(user_html_file, "w") as output_f:
         output_f.write(USER_HTML_HEADER.format(user=args.user))
-        for path, server in entries:
-            output_f.write(USER_HTML_CONTENT.format(path=path))
+        for path, _, descr in entries:
+            output_f.write(USER_HTML_CONTENT.format(path=path, descr=descr))
         output_f.write(USER_HTML_FOOTER)
 
     print("Trying to reload nginx so that changes are taken into account...")
@@ -226,14 +226,15 @@ def write_entries(args, entries):
 def list_available(args):
     entries = get_available_entries(args)
     print("Available links for {}:".format(args.user))
-    for path, server in entries:
-        print("{} => {}".format(path, server))
+    for path, server, descr in entries:
+        print("{} => {} ({})".format(path, server, descr))
 
 def add_entry(args):
     entries = get_available_entries(args)
     path = input("What is the path you want your link to be available at? ")
     serv_addr = input("What is the server address the path should point to? ")
     serv_port = input("What is the server port the path should point to? ")
+    descr = input("Enter a one-line description for this link: ")
 
     if path.startswith('/'):
         path = path[1:]
@@ -241,7 +242,7 @@ def add_entry(args):
     server = "http://{}:{}/".format(serv_addr, serv_port)
 
     already_exists = False
-    for p, s in entries:
+    for p, _, _ in entries:
         if p == path:
             already_exists = True
             break
@@ -257,7 +258,7 @@ def add_entry(args):
         elif answer == "n":
             return
 
-    entries.append((path, server))
+    entries.append((path, server, descr))
     write_entries(args, entries)
 
     _, user_cred_file, _ = get_user_files(args)
@@ -274,8 +275,8 @@ def add_entry(args):
 def delete_entry(args):
     entries = get_available_entries(args)
     print("Available links for {}:".format(args.user))
-    for idx, (path, server) in enumerate(entries):
-        print("[{}] {} => {}".format(idx, path, server))
+    for idx, (path, server, descr) in enumerate(entries):
+        print("[{}] {} => {} ({})".format(idx, path, server, descr))
     while True:
         answer = input("Enter number of the link you want to delete: ")
         try:
@@ -288,7 +289,7 @@ def delete_entry(args):
             print("Enter a single number.")
 
     entry_to_del = entries[to_del]
-    print("You are going to delete {} => {}".format(entry_to_del[0], entry_to_del[1]))
+    print("You are going to delete {} => {} ({})".format(*entry_to_del))
     while True:
         answer = input("Are you sure (y/n)? ")
         if answer == "y":
