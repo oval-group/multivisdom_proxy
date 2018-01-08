@@ -18,7 +18,7 @@ In this tutorial, we assume that the address of the proxy server is `proxyserver
 #### Configuration
 
 You will need a user with write access to the nginx folder (sudoer in general, or normal user if you have a non-global nginx install).
-* To initialize the nginx configuration: run `sudo python multivisdom_setup.py` (needs sudoer).
+* To initialize the nginx configuration (with port 1234 for our example): run `sudo python multivisdom_setup.py --port 1234` (needs sudoer).
 * To allow unprivileged users to reload `nginx` after they make changes, do the following steps:
     * Run `sudo visudo`
     * Go to last line and add: `ALL ALL=NOPASSWD: /usr/sbin/service nginx reload` and a comment `# Allow all users to reload nginx`. All users (even not sudoers) can now run `sudo /usr/sbin/service nginx reload`.
