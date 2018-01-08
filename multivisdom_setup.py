@@ -1,6 +1,9 @@
 # For python 2 and 3 compatibility
 from __future__ import print_function
-from builtins import input
+import sys
+if sys.version_info[0] < 3:
+    input = raw_input
+
 
 import argparse
 import os
@@ -35,6 +38,19 @@ server {{
 }}
 """
 
+USER_CONF_HTML_TEMPLATE = """
+location /{user}/ {{
+    rewrite (.*) /{user};
+}}
+
+location = /{user} {{
+    auth_basic "Protected access";
+    auth_basic_user_file {cred_file};
+    default_type "text/html";
+    alias {html_file};
+}}
+"""
+
 USER_CONF_TEMPLATE = """
 {header}
 location {path}/ {{
@@ -51,8 +67,40 @@ location {path}/ {{
 }}
 """
 
+USER_HTML_HEADER = """
+<title>Boards for {user}</title>
+<body>
+<h2>Boards for {user}</h2>
+<hr>
+<ul>
+"""
+
+USER_HTML_CONTENT = """
+<li><a href="{path}">{path}</a>
+"""
+
+USER_HTML_FOOTER = """
+</ul>
+<hr>
+</body>
+</html>
+"""
+
 SPECIAL_COMMENT_MARK = "###"
 SPECIAL_COMMENT_SEPARATOR = ","
+
+def get_shared_conf(args):
+    all_conf_file_path = os.path.join(args.nginx_path, "sites-available", "multi_visdom_all.conf")
+    all_conf_link_path = os.path.join(args.nginx_path, "sites-enabled", "multi_visdom")
+    all_conf_folder = os.path.join(args.nginx_path, "sites-available", "multivisdom")
+    return all_conf_file_path, all_conf_link_path, all_conf_folder
+
+def get_user_files(args):
+    user_conf_file = os.path.join(args.nginx_path, "sites-available", "multivisdom", args.user+".conf")
+    user_cred_file = os.path.join(args.nginx_path, "sites-available", "multivisdom", args.user+".htpasswd")
+    user_html_file = os.path.join(args.nginx_path, "sites-available", "multivisdom", args.user+".html")
+    return user_conf_file, user_cred_file, user_html_file
+
 
 def ask_what_to_do():
     print("")
@@ -67,7 +115,7 @@ def ask_what_to_do():
     print("")
     print("Options that should be used by privileged users only:")
     print("{}: to initialize configuration of nginx (done once by main user).".format(ACTION_INIT))
-    print("{}: to clean all files from the nginx configuration.".format(ACTION_CLEAN))
+    print("{}: to nuke all files from the nginx configuration created by this script.".format(ACTION_CLEAN))
     while True:
         answer = input("\nType the number of what you want to do: ")
         try:
@@ -89,9 +137,7 @@ def init_nginx(args):
        (not os.path.isdir(os.path.join(args.nginx_path, "sites-enabled"))):
         raise RuntimeError("Provided nginx path is not correct, 'sites-available' or 'sites-enabled' not existing.")
 
-    all_conf_file_path = os.path.join(args.nginx_path, "sites-available", "multi_visdom_all.conf")
-    all_conf_link_path = os.path.join(args.nginx_path, "sites-enabled", "multi_visdom")
-    all_conf_folder = os.path.join(args.nginx_path, "sites-available", "multivisdom")
+    all_conf_file_path, all_conf_link_path, all_conf_folder = get_shared_conf(args)
 
     if os.path.exists(all_conf_file_path) or os.path.exists(all_conf_folder):
         print("Some multivisdom configuration already exists, you need to clean you nginx config first.")
@@ -100,7 +146,7 @@ def init_nginx(args):
             if answer == "q":
                 return
             elif answer == "c":
-                clean_nginx(args)
+                nuke_nginx(args)
                 break
 
     try:
@@ -115,6 +161,9 @@ def init_nginx(args):
 
     os.symlink(all_conf_file_path, all_conf_link_path)
 
+    print("Trying to reload nginx so that changes are taken into account...")
+    os.system("sudo /usr/sbin/service nginx reload")
+
     print("Init completed.")
 
 def try_del(path):
@@ -126,23 +175,24 @@ def try_del(path):
     except:
         print("could not remove {} either it does not exist or you are not allowed to.".format(path))
 
-def clean_nginx(args):
+def nuke_nginx(args):
     if (not os.path.isdir(os.path.join(args.nginx_path, "sites-available"))) or \
        (not os.path.isdir(os.path.join(args.nginx_path, "sites-enabled"))):
         raise RuntimeError("Provided nginx path is not correct, 'sites-available' or 'sites-enabled' not existing.")
 
-    all_conf_file_path = os.path.join(args.nginx_path, "sites-available", "multi_visdom_all.conf")
-    all_conf_link_path = os.path.join(args.nginx_path, "sites-enabled", "multi_visdom")
-    all_conf_folder = os.path.join(args.nginx_path, "sites-available", "multivisdom")
+    all_conf_file_path, all_conf_link_path, all_conf_folder = get_shared_conf(args)
 
     try_del(all_conf_link_path)
     try_del(all_conf_file_path)
     try_del(all_conf_folder)
 
-    print("Clean completed.")
+    print("Trying to reload nginx so that changes are taken into account...")
+    os.system("sudo /usr/sbin/service nginx reload")
+
+    print("Nuke completed.")
 
 def get_available_entries(args):
-    user_file = os.path.join(args.nginx_path, "sites-available", "multivisdom", args.user+".conf")
+    user_file, _, _ = get_user_files(args)
     entries = []
     if os.path.isfile(user_file):
         with open(user_file, "r") as f:
@@ -153,13 +203,22 @@ def get_available_entries(args):
     return entries
 
 def write_entries(args, entries):
-    user_file = os.path.join(args.nginx_path, "sites-available", "multivisdom", args.user+".conf")
-    user_cred_file = os.path.join(args.nginx_path, "sites-available", "multivisdom", args.user+".htpasswd")
+    user_file, user_cred_file, user_html_file = get_user_files(args)
     with open(user_file, "w") as output_f:
         for path, server in entries:
             header = SPECIAL_COMMENT_MARK+path+SPECIAL_COMMENT_SEPARATOR+server
             output_f.write(USER_CONF_TEMPLATE.format(header=header, path=path, server=server, cred_file=user_cred_file))
             output_f.write("\n\n")
+
+        # Add html page to it
+        output_f.write(USER_CONF_HTML_TEMPLATE.format(user=args.user, cred_file=user_cred_file, html_file=user_html_file))
+        output_f.write("\n\n")
+
+    with open(user_html_file, "w") as output_f:
+        output_f.write(USER_HTML_HEADER.format(user=args.user))
+        for path, server in entries:
+            output_f.write(USER_HTML_CONTENT.format(path=path))
+        output_f.write(USER_HTML_FOOTER)
 
     print("Trying to reload nginx so that changes are taken into account...")
     os.system("sudo /usr/sbin/service nginx reload")
@@ -181,6 +240,15 @@ def add_entry(args):
     path = "/{}/{}".format(args.user, path)
     server = "http://{}:{}/".format(serv_addr, serv_port)
 
+    already_exists = False
+    for p, s in entries:
+        if p == path:
+            already_exists = True
+            break
+    if already_exists:
+        print("The path {} is already used, please choose a different one.".format(path))
+        return
+
     print("You are about to create the mapping: {} => {}".format(path, server))
     while True:
         answer = input("Are your sure (y/n)? ")
@@ -191,6 +259,17 @@ def add_entry(args):
 
     entries.append((path, server))
     write_entries(args, entries)
+
+    _, user_cred_file, _ = get_user_files(args)
+    if not os.path.exists(user_cred_file):
+        while True:
+            answer = input("No credentials exist for your user, do you want to add one (y/n)? ")
+            if answer == "y":
+                add_cred(args)
+                break
+            elif answer == "n":
+                break
+
 
 def delete_entry(args):
     entries = get_available_entries(args)
@@ -221,7 +300,7 @@ def delete_entry(args):
     write_entries(args, entries)
 
 def add_cred(args):
-    user_cred_file = os.path.join(args.nginx_path, "sites-available", "multivisdom", args.user+".htpasswd")
+    _, user_cred_file, _ = get_user_files(args)
     username = input("What is the username for the credentials? ")
     os.system("htpasswd -c {} {}".format(user_cred_file, username))
 
@@ -231,13 +310,10 @@ if __name__ == "__main__":
                         help="path to the nginx's install folder.")
     parser.add_argument("--port", type=int, default=1234,
                         help="Port on which the server will be available (used for init only).")
-    parser.add_argument("--user", type=str, default="",
-                        help="User for which you want to add entries, default is current username")
     args = parser.parse_args()
 
-    if args.user == "":
-        args.user = getpass.getuser()
-        print("Username detected automatically: {}".format(args.user))
+    args.user = getpass.getuser()
+    print("Username detected automatically: {}".format(args.user))
 
     while True:
         todo = ask_what_to_do()
@@ -247,7 +323,7 @@ if __name__ == "__main__":
         elif todo == ACTION_INIT:
             init_nginx(args)
         elif todo == ACTION_CLEAN:
-            clean_nginx(args)
+            nuke_nginx(args)
         elif todo == ACTION_LIST:
             list_available(args)
         elif todo == ACTION_ADD:
