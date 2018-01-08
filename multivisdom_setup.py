@@ -107,17 +107,17 @@ def ask_what_to_do():
     print("")
     print("This tool will help you configure a multivisdom proxy with nginx.")
     print("Possible actions:")
-    print("{}: to quit.".format(ACTION_STOP))
-    print("{}: to list all links for your user.".format(ACTION_LIST))
-    print("{}: to add a link for your user.".format(ACTION_ADD))
-    print("{}: to delete a link for your user.".format(ACTION_DEL))
-    print("{}: to add access credential for your user's links.".format(ACTION_PASS))
+    print("{}: Quit.".format(ACTION_STOP))
+    print("{}: List all links for your user.".format(ACTION_LIST))
+    print("{}: Add a link for your user.".format(ACTION_ADD))
+    print("{}: Delete a link for your user.".format(ACTION_DEL))
+    print("{}: Add access credential for your user's links.".format(ACTION_PASS))
     print("")
     print("Options that should be used by privileged users only:")
-    print("{}: to initialize configuration of nginx (done once by main user).".format(ACTION_INIT))
-    print("{}: to nuke all files from the nginx configuration created by this script.".format(ACTION_CLEAN))
+    print("{}: Initialize configuration of nginx (done once by main user).".format(ACTION_INIT))
+    print("{}: Nuke all files from the nginx configuration created by this script.".format(ACTION_CLEAN))
     while True:
-        answer = input("\nType the number of what you want to do: ")
+        answer = input("\nAction number: ")
         try:
             answer = int(answer)
             if answer >= 0 and answer < NUM_ACTIONS:
@@ -231,10 +231,10 @@ def list_available(args):
 
 def add_entry(args):
     entries = get_available_entries(args)
-    path = input("What is the path you want your link to be available at? ")
-    serv_addr = input("What is the server address the path should point to? ")
-    serv_port = input("What is the server port the path should point to? ")
-    descr = input("Enter a one-line description for this link: ")
+    path = input("Link name on proxy server: ")
+    serv_addr = input("Server address: ")
+    serv_port = input("Server port: ")
+    descr = input("One-line description: ")
 
     if path.startswith('/'):
         path = path[1:]
@@ -252,7 +252,7 @@ def add_entry(args):
 
     print("You are about to create the mapping: {} => {}".format(path, server))
     while True:
-        answer = input("Are your sure (y/n)? ")
+        answer = input("Are you sure? (y/n) ")
         if answer == "y":
             break
         elif answer == "n":
@@ -276,13 +276,13 @@ def delete_entry(args):
     entries = get_available_entries(args)
     print("Available links for {}:".format(args.user))
     for idx, (path, server, descr) in enumerate(entries):
-        print("[{}] {} => {} ({})".format(idx, path, server, descr))
+        print("{}: {} => {} ({})".format(idx, path, server, descr))
     while True:
-        answer = input("Enter number of the link you want to delete: ")
+        answer = input("Id of link to delete: ")
         try:
             to_del = int(answer)
             if to_del < 0 or to_del >= len(entries):
-                print("Enter one of the digits above.")
+                print("Enter one of the ids above.")
             else:
                 break
         except:
@@ -335,6 +335,6 @@ if __name__ == "__main__":
             add_cred(args)
         else:
             print("Wrong choice.")
-            
+
 
 
