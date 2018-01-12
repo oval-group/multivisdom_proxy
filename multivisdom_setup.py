@@ -303,7 +303,9 @@ def delete_entry(args):
 def add_cred(args):
     _, user_cred_file, _ = get_user_files(args)
     username = input("What is the username for the credentials? ")
-    os.system("htpasswd -c {} {}".format(user_cred_file, username))
+    # create password file if it does not exist yet
+    opt = '-c' if not os.path.exists(user_cred_file) else ''
+    os.system("htpasswd {} {} {}".format(opt, user_cred_file, username))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Configure nginx for multivisdom proxy.')
