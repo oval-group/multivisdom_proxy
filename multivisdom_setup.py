@@ -174,6 +174,9 @@ def try_del(path):
             os.remove(path)
     except:
         print("could not remove {} either it does not exist or you are not allowed to.".format(path))
+        return False
+
+    return True
 
 def nuke_nginx(args):
     if (not os.path.isdir(os.path.join(args.nginx_path, "sites-available"))) or \
@@ -182,7 +185,9 @@ def nuke_nginx(args):
 
     all_conf_file_path, all_conf_link_path, all_conf_folder = get_shared_conf(args)
 
-    try_del(all_conf_link_path)
+    if not try_del(all_conf_link_path):
+        # Early stop if user is not sudoer
+        return
     try_del(all_conf_file_path)
     try_del(all_conf_folder)
 
